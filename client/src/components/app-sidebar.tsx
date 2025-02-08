@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import info from "@/lib/info.json";
 import {
     Sidebar,
     SidebarContent,
@@ -11,12 +9,13 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { apiClient } from "@/lib/api";
-import { NavLink, useLocation } from "react-router";
+import info from "@/lib/info.json";
 import type { UUID } from "@elizaos/core";
-import { Book, Cog, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Cog, User } from "lucide-react";
+import { NavLink, useLocation } from "react-router";
 import ConnectionStatus from "./connection-status";
 
 export function AppSidebar() {

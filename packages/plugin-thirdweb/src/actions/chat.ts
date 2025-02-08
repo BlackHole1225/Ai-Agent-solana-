@@ -6,6 +6,7 @@ import {
     type State,
     type Action,
 } from "@elizaos/core";
+import { ThirdwebNubulaService } from "../services/ThirdwebNebulaApiService";
 
 const BASE_URL = "https://nebula-api.thirdweb.com";
 
@@ -84,8 +85,9 @@ export const blockchainChatAction: Action = {
         _state: State,
         _options: Record<string, unknown>,  // Replaced any with Record<string, unknown>
         callback: HandlerCallback
-    ): Promise<Record<string, unknown> | ReadableStream> => { 
+    ): Promise<Record<string, unknown> | ReadableStream> => {
         try {
+            const thirdwebNubulaService = ThirdwebNubulaService();
             elizaLogger.log("Starting blockchain chat handler");
             const secretKey =
                 runtime.getSetting("THIRDWEB_SECRET_KEY") ??
@@ -98,12 +100,14 @@ export const blockchainChatAction: Action = {
 
             const request = {
                 message: message.content.text,
+                user_id: "default-user",
                 stream: false,
             };
 
             elizaLogger.log("NEBULA CHAT REQUEST: ", request);
 
             elizaLogger.debug("Sending request to Nebula API");
+
             const response = await fetch(`${BASE_URL}/chat`, {
                 method: "POST",
                 headers: {
@@ -113,6 +117,10 @@ export const blockchainChatAction: Action = {
                 body: JSON.stringify(request),
             });
             elizaLogger.debug("Received response from Nebula API");
+
+            const res = await response.json();
+            console.log("thirdweb res:", res);
+
 
             if (!request.stream) {
                 const text = await response.text();
