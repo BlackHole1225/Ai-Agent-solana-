@@ -335,6 +335,7 @@ export class DirectClient {
                 const shouldSuppressInitialMessage =
                     action?.suppressInitialMessage;
 
+                console.log("final response", response, message, shouldSuppressInitialMessage);
                 if (!shouldSuppressInitialMessage) {
                     if (message) {
                         res.json([response, message]);
