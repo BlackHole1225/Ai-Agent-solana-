@@ -53,6 +53,7 @@ import { createNodePlugin } from "@elizaos/plugin-node";
 import { OpacityAdapter } from "@elizaos/plugin-opacity";
 import { TEEMode } from "@elizaos/plugin-tee";
 import { thirdwebPlugin } from "@elizaos/plugin-thirdweb";
+import { bnvPlugin } from "@elizaos/plugin-bnv";
 // import { pythDataPlugin } from "@elizaos/plugin-pyth-data";
 // import { hyperbolicPlugin } from "@elizaos/plugin-hyperbolic";
 import Database from "better-sqlite3";
@@ -921,7 +922,7 @@ export async function createAgent(
         character,
         // character.plugins are handled when clients are added
         plugins: [
-            getSecret(character, "THIRDWEB_SECRET_KEY") ? thirdwebPlugin : null
+            bnvPlugin
         ]
             .flat()
             .filter(Boolean),

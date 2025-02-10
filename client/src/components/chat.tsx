@@ -23,13 +23,20 @@ import type { IAttachment } from "@/types";
 import { AudioRecorder } from "./audio-recorder";
 import { Badge } from "./ui/badge";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
-import { ConnectButton } from "thirdweb/react";
-import { client } from "@/lib/thirdwebClient";
+import { ConnectButton, useSendTransaction, useSendAndConfirmTransaction } from "thirdweb/react";
+import { client, getErc20Contract } from "@/lib/thirdwebClient";
+import { transfer } from "thirdweb/extensions/erc20";
 
 type ExtraContentFields = {
     user: string;
     createdAt: number;
     isLoading?: boolean;
+    content?: {
+        tokenAddress: string;
+        tokenSymbol: string;
+        amount: string;
+        recipient: string;
+    }
 };
 
 type ContentWithUser = Content & ExtraContentFields;
@@ -46,6 +53,11 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
 
+    const { mutate: sendTransaction, error, data: txData, isPending: txPending } = useSendAndConfirmTransaction();
+
+    if (error) console.error(error);
+    if (txData) console.log(txData);
+
     const queryClient = useQueryClient();
 
     const getMessageVariant = (role: string) =>
@@ -54,6 +66,23 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const { scrollRef, isAtBottom, scrollToBottom, disableAutoScroll } = useAutoScroll({
         smooth: true,
     });
+
+    useEffect(() => {
+        if (txData?.status === "success") {
+            console.log('successfully')
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[] = []) => [
+                    ...old.filter((msg) => !msg.isLoading),
+                    {
+                        user: "Black",
+                        text: `Token transfer was successful.\n Transaction Hash: ${txData.transactionHash}`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+        }
+    }, [txData])
 
     useEffect(() => {
         scrollToBottom();
@@ -131,6 +160,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
             selectedFile?: File | null;
         }) => apiClient.sendMessage(agentId, message, selectedFile),
         onSuccess: (newMessages: ContentWithUser[]) => {
+            console.log(newMessages)
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[] = []) => [
@@ -141,8 +171,22 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     })),
                 ]
             );
+
+            console.log("newMessages:", newMessages);
+            if (newMessages.length > 1 && newMessages[1]?.content) {
+                const content = newMessages[1].content;
+                console.log("content", content);
+                const contract = getErc20Contract(content.tokenAddress);
+                const transaction = transfer({
+                    contract,
+                    to: content.recipient,
+                    amount: content.amount,
+                });
+                sendTransaction(transaction);
+            }
         },
         onError: (e) => {
+            console.error(e)
             toast({
                 variant: "destructive",
                 title: "Unable to send message",
@@ -251,7 +295,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                                             </div>
                                         </ChatBubbleMessage>
                                         <div className="flex items-center gap-4 justify-between w-full mt-1">
-                                            {message?.text &&
+                                            {message?.text?.length &&
                                                 !message?.isLoading ? (
                                                 <div className="flex items-center gap-1">
                                                     <CopyButton
@@ -368,7 +412,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                             onChange={(newInput: string) => setInput(newInput)}
                         />
                         <Button
-                            disabled={!input || sendMessageMutation?.isPending}
+                            disabled={!input || sendMessageMutation?.isPending || txPending}
                             type="submit"
                             size="sm"
                             className="ml-auto gap-1.5 h-[30px]"
