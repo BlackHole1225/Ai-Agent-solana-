@@ -12,7 +12,7 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
     <StrictMode>
-        <ThirdwebProvider>
+        <ThirdwebProvider >
             <App />
         </ThirdwebProvider>
     </StrictMode>

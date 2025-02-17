@@ -6,26 +6,27 @@ import {
 } from "@/components/ui/chat/chat-bubble";
 import { ChatInput } from "@/components/ui/chat/chat-input";
 import { ChatMessageList } from "@/components/ui/chat/chat-message-list";
-import { useTransition, animated, type AnimatedProps } from "@react-spring/web";
+import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
+import { client, getErc20Contract } from "@/lib/thirdwebClient";
+import { cn, moment } from "@/lib/utils";
+import type { IAttachment } from "@/types";
+import type { Content, UUID } from "@elizaos/core";
+import { animated, useTransition, type AnimatedProps } from "@react-spring/web";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { Content, UUID } from "@elizaos/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api";
-import { cn, moment } from "@/lib/utils";
-import { Avatar, AvatarImage } from "./ui/avatar";
-import CopyButton from "./copy-button";
-import ChatTtsButton from "./ui/chat/chat-tts-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { useToast } from "@/hooks/use-toast";
 import AIWriter from "react-aiwriter";
-import type { IAttachment } from "@/types";
+import { getBalance, transfer } from "thirdweb/extensions/erc20";
+import { ConnectButton, useSendAndConfirmTransaction } from "thirdweb/react";
 import { AudioRecorder } from "./audio-recorder";
+import CopyButton from "./copy-button";
+import { Avatar, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
+import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
-import { ConnectButton, useSendTransaction, useSendAndConfirmTransaction } from "thirdweb/react";
-import { client, getErc20Contract } from "@/lib/thirdwebClient";
-import { transfer } from "thirdweb/extensions/erc20";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { sepolia } from "thirdweb/chains";
 
 type ExtraContentFields = {
     user: string;
@@ -36,6 +37,7 @@ type ExtraContentFields = {
         tokenSymbol: string;
         amount: string;
         recipient: string;
+        walletAddress: string;
     }
 };
 
@@ -67,22 +69,24 @@ export default function Page({ agentId }: { agentId: UUID }) {
         smooth: true,
     });
 
+    const [forceRender, setForceRender] = useState(false);
+
     useEffect(() => {
         if (txData?.status === "success") {
-            console.log('successfully')
+            console.log('successfully', txData.transactionHash);
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[] = []) => [
                     ...old.filter((msg) => !msg.isLoading),
                     {
-                        user: "Black",
                         text: `Token transfer was successful.\n Transaction Hash: ${txData.transactionHash}`,
                         createdAt: Date.now(),
                     }
                 ]
             );
+            setForceRender(prev => !prev);
         }
-    }, [txData])
+    }, [txData]);
 
     useEffect(() => {
         scrollToBottom();
@@ -159,7 +163,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
             message: string;
             selectedFile?: File | null;
         }) => apiClient.sendMessage(agentId, message, selectedFile),
-        onSuccess: (newMessages: ContentWithUser[]) => {
+        onSuccess: async (newMessages: ContentWithUser[]) => {
             console.log(newMessages)
             queryClient.setQueryData(
                 ["messages", agentId],
@@ -175,14 +179,36 @@ export default function Page({ agentId }: { agentId: UUID }) {
             console.log("newMessages:", newMessages);
             if (newMessages.length > 1 && newMessages[1]?.content) {
                 const content = newMessages[1].content;
+                const action = newMessages[0].action;
                 console.log("content", content);
                 const contract = getErc20Contract(content.tokenAddress);
-                const transaction = transfer({
-                    contract,
-                    to: content.recipient,
-                    amount: content.amount,
-                });
-                sendTransaction(transaction);
+
+                switch(action){
+                    case "GET_BALANCE":
+                        const balance = await getBalance({contract, address: content.walletAddress});
+                        const formattedBalance = Number(balance.value) / 1e6;
+                        queryClient.setQueryData(
+                            ["messages", agentId],
+                            (old: ContentWithUser[]) => [
+                                ...old,
+                                {
+                                    text: `Balance retrieved: ${formattedBalance.toFixed(2)} USDC`,
+                                    createdAt: Date.now(),
+                                }
+                            ]
+                        );
+                        return;
+                    case "TRANSFER_TOKEN":
+                        const transaction = transfer({
+                            contract,
+                            to: content.recipient,
+                            amount: content.amount,
+                        });
+                        sendTransaction(transaction);
+                        return;
+
+                }
+              
             }
         },
         onError: (e) => {
@@ -229,6 +255,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                         }
                     }}
                     client={client}
+                    chain={sepolia}
                 />
             </div>
             <div className="flex-1 overflow-y-auto">

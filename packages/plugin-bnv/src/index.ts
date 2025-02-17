@@ -5,7 +5,7 @@ import tokenTransfer from "./actions/tokenTransfer.ts";
 export const bnvPlugin: Plugin = {
     name: "bnv",
     description: "Agent for users in optimizm",
-    actions: [ tokenTransfer],
+    actions: [ tokenTransfer, getBalanceByAddress],
     evaluators: [],
     providers: [],
 };

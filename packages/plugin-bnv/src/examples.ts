@@ -1,6 +1,6 @@
 import type { ActionExample } from "@elizaos/core";
 
-export const getWalletBalaceAddressExample: ActionExample[][] = [
+export const getWalletBalanceAddressExample: ActionExample[][] = [
   [
     {
       user: "{{user1}}",
@@ -11,7 +11,8 @@ export const getWalletBalaceAddressExample: ActionExample[][] = [
     {
       user: "{{agent}}",
       content: {
-        text: "In what city?",
+        text: "Will check transaction",
+        action: "GET_BALANCE"
       },
     }
   ],
@@ -25,7 +26,23 @@ export const getWalletBalaceAddressExample: ActionExample[][] = [
     {
       user: "{{agent}}",
       content: {
-        text: "In what city?",
+        text: "Will check transaction",
+        action: "GET_BALANCE"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "I wanna check wallet balance of 0x1e9F3bD30C9ACA6e32B92CE2cD56ceB4DD456Bb2",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will check transaction",
+        action: "GET_BALANCE"
       },
     }
   ]
