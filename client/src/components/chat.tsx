@@ -26,7 +26,7 @@ import { Badge } from "./ui/badge";
 import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { sepolia } from "thirdweb/chains";
+import { mainnet, sepolia, base, polygon } from "thirdweb/chains";
 
 type ExtraContentFields = {
     user: string;
@@ -255,7 +255,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                         }
                     }}
                     client={client}
-                    chain={sepolia}
+                    chains={[mainnet, sepolia, base, polygon]}
                 />
             </div>
             <div className="flex-1 overflow-y-auto">
