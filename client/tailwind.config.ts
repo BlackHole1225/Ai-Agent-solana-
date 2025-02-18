@@ -76,8 +76,13 @@ export default {
     				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
     				border: 'hsl(var(--sidebar-border))',
     				ring: 'hsl(var(--sidebar-ring))'
-    			}
-    		}
+    			},
+    			modalBackground: 'hsl(var(--modal-background))',
+    			modalText: 'hsl(var(--modal-text))',
+    		},
+    		spacing: {
+    			'modal-padding': '1.5rem',
+    		},
     	}
     },
     plugins: [tailwindAnimate],

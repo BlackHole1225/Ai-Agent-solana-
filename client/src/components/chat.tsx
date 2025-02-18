@@ -26,7 +26,9 @@ import { Badge } from "./ui/badge";
 import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { mainnet, sepolia, base, polygon } from "thirdweb/chains";
+import { mainnet, sepolia, base, polygon, baseSepolia } from "thirdweb/chains";
+import GenerateWalletModal from "./GenerateWalletModal";
+import type { IWalletInfo } from "@/types";
 
 type ExtraContentFields = {
     user: string;
@@ -51,6 +53,11 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const { toast } = useToast();
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [input, setInput] = useState("");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [walletInfo, setWalletInfo] = useState<IWalletInfo | null>(null);
+
+    const openModal = () => setIsModalOpen(true);
+    const closeModal = () => setIsModalOpen(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
@@ -183,9 +190,10 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 console.log("content", content);
                 const contract = getErc20Contract(content.tokenAddress);
 
-                switch(action){
+                switch (action) {
                     case "GET_BALANCE":
-                        const balance = await getBalance({contract, address: content.walletAddress});
+                        const balance = await getBalance({ contract, address: content.walletAddress });
+                        console.log(balance)
                         const formattedBalance = Number(balance.value) / 1e6;
                         queryClient.setQueryData(
                             ["messages", agentId],
@@ -208,7 +216,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                         return;
 
                 }
-              
+
             }
         },
         onError: (e) => {
@@ -242,10 +250,18 @@ export default function Page({ agentId }: { agentId: UUID }) {
 
     const CustomAnimatedDiv = animated.div as React.FC<AnimatedDivProps>;
 
+    const handleWalletGenerated = (walletInfo: IWalletInfo) => {
+        setWalletInfo(walletInfo);
+        console.log('Wallet info received:', walletInfo);
+    };
+
     return (
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
             <div className="flex justify-end">
-                <ConnectButton
+                <Button onClick={openModal}>
+                    {walletInfo ? `Wallet: ${walletInfo?.wallet.address.slice(0, 6)}...${walletInfo?.wallet.address.slice(-4)}` : "Generate Wallet"}
+                </Button>
+                {/* <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',
                         style: {
@@ -254,9 +270,19 @@ export default function Page({ agentId }: { agentId: UUID }) {
                             minWidth: "120px"
                         }
                     }}
+                    detailsModal={{
+                        payOptions: {
+                            buyWithFiat: {
+                                testMode: true,
+                                preferredProvider: "COINBASE",
+                            },
+                        },
+                    }}
                     client={client}
-                    chains={[mainnet, sepolia, base, polygon]}
-                />
+                    chains={[mainnet, sepolia, base, polygon, baseSepolia]}
+                /> */}
+                
+
             </div>
             <div className="flex-1 overflow-y-auto">
                 <ChatMessageList
@@ -452,6 +478,12 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     </div>
                 </form>
             </div>
+            <GenerateWalletModal 
+                isOpen={isModalOpen} 
+                onClose={closeModal} 
+                onWalletGenerated={handleWalletGenerated} 
+                walletInfo={walletInfo}
+            />
         </div>
     );
 }
