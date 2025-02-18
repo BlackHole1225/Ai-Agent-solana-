@@ -261,7 +261,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 <Button onClick={openModal}>
                     {walletInfo ? `Wallet: ${walletInfo?.wallet.address.slice(0, 6)}...${walletInfo?.wallet.address.slice(-4)}` : "Generate Wallet"}
                 </Button>
-                {/* <ConnectButton
+                <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',
                         style: {
@@ -280,7 +280,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     }}
                     client={client}
                     chains={[mainnet, sepolia, base, polygon, baseSepolia]}
-                /> */}
+                />
                 
 
             </div>
