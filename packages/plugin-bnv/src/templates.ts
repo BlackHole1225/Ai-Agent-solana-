@@ -1,7 +1,7 @@
 export const transferTemplate = `Respond with a JSON markdown block containing only the extracted values. Use null for any values that cannot be determined.
 
 Here are several frequently used addresses. Use these for the corresponding tokens:
-- ETH/eth: 0x000000000000000000000000000000000000800A
+- ETH/eth: 0xcA11bde05977b3631167028862bE2a173976CA11
 - USDC/usdc: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
 
 Example response:
@@ -27,7 +27,7 @@ Respond with a JSON markdown block containing only the extracted values.`;
 export const balanceTemplate = `Respond with a JSON markdown block containing only the extracted values. Use null for any values that cannot be determined.
 
 Here are several frequently used addresses. Use these for the corresponding tokens:
-- ETH/eth: 0x000000000000000000000000000000000000800A
+- ETH/eth: 0xcA11bde05977b3631167028862bE2a173976CA11
 - USDC/usdc: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
 
 Example response:

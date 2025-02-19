@@ -29,7 +29,7 @@ export interface GetBalance extends Content {
 }
 
 export default {
-  name: "getBalance",
+  name: "GET_BALANCE",
   similes: ["GET_BALANCE","CHECK_BALANCE"],
   description: "Get balance by wallet address",
   examples: getWalletBalanceAddressExample,
