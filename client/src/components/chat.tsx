@@ -27,8 +27,12 @@ import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { mainnet, sepolia, base, polygon, baseSepolia } from "thirdweb/chains";
+import { inAppWallet } from "thirdweb/wallets";
 import GenerateWalletModal from "./GenerateWalletModal";
-import type { IWalletInfo } from "@/types";
+import { SiteEmbed } from "thirdweb/react";
+
+
+import type { IWalletInfo } from "@/types/index";
 
 type ExtraContentFields = {
     user: string;
@@ -48,13 +52,20 @@ type ContentWithUser = Content & ExtraContentFields;
 type AnimatedDivProps = AnimatedProps<{ style: React.CSSProperties }> & {
     children?: React.ReactNode;
 };
-
+const wallets = [
+    inAppWallet({
+        auth: { options: ["email", "passkey", "google"] },
+    }),
+];
 export default function Page({ agentId }: { agentId: UUID }) {
     const { toast } = useToast();
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [input, setInput] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [walletInfo, setWalletInfo] = useState<IWalletInfo | null>(null);
+    const [walletInfo, setWalletInfo] = useState<IWalletInfo>({
+        address:'',
+        type:''
+    });
 
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
@@ -188,35 +199,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 const content = newMessages[1].content;
                 const action = newMessages[0].action;
                 console.log("content", content);
-                const contract = getErc20Contract(content.tokenAddress);
-
-                switch (action) {
-                    case "GET_BALANCE":
-                        const balance = await getBalance({ contract, address: content.walletAddress });
-                        console.log(balance)
-                        const formattedBalance = Number(balance.value) / 1e6;
-                        queryClient.setQueryData(
-                            ["messages", agentId],
-                            (old: ContentWithUser[]) => [
-                                ...old,
-                                {
-                                    text: `Balance retrieved: ${formattedBalance.toFixed(2)} USDC`,
-                                    createdAt: Date.now(),
-                                }
-                            ]
-                        );
-                        return;
-                    case "TRANSFER_TOKEN":
-                        const transaction = transfer({
-                            contract,
-                            to: content.recipient,
-                            amount: content.amount,
-                        });
-                        sendTransaction(transaction);
-                        return;
-
-                }
-
+                await handleAction(action, content);
             }
         },
         onError: (e) => {
@@ -252,14 +235,51 @@ export default function Page({ agentId }: { agentId: UUID }) {
 
     const handleWalletGenerated = (walletInfo: IWalletInfo) => {
         setWalletInfo(walletInfo);
-        console.log('Wallet info received:', walletInfo);
+    };
+
+    const handleAction = async (action: any, content: any) => {
+        switch (action) {
+            case "GET_BALANCE":
+                const balanceContract = getErc20Contract(content.tokenAddress);
+                const balance = await getBalance({ contract:balanceContract, address: content.walletAddress });
+                const formattedBalance = Number(balance.value) / 1e6;
+                queryClient.setQueryData(
+                    ["messages", agentId],
+                    (old: ContentWithUser[]) => [
+                        ...old,
+                        {
+                            text: `Balance retrieved: ${formattedBalance.toFixed(2)} USDC`,
+                            createdAt: Date.now(),
+                        }
+                    ]
+                );
+                return;
+            case "TRANSFER_TOKEN":
+                const TransferContract = getErc20Contract(content.tokenAddress);
+                const transaction = transfer({
+                    contract:TransferContract,
+                    to: content.recipient,
+                    amount: content.amount,
+                });
+                sendTransaction(transaction);
+                return;
+            case "CREATE_PREWALLET":
+                try {
+                    const walletInfo = await apiClient.pregenerateWallet(content.emailAddress);
+                    setWalletInfo(walletInfo);
+                } catch (error) {
+                    console.error('Error creating prewallet:', error);
+                }
+                return;
+        }
     };
 
     return (
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
+
             <div className="flex justify-end">
                 <Button onClick={openModal}>
-                    {walletInfo ? `Wallet: ${walletInfo?.wallet.address.slice(0, 6)}...${walletInfo?.wallet.address.slice(-4)}` : "Generate Wallet"}
+                    {walletInfo?.address ? `Wallet: ${walletInfo?.address.slice(0, 6)}...${walletInfo?.address.slice(-4)}` : "Generate Wallet"}
                 </Button>
                 <ConnectButton
                     connectButton={{
@@ -278,10 +298,11 @@ export default function Page({ agentId }: { agentId: UUID }) {
                             },
                         },
                     }}
+                    wallets={wallets}
                     client={client}
                     chains={[mainnet, sepolia, base, polygon, baseSepolia]}
                 />
-                
+
 
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -478,10 +499,10 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     </div>
                 </form>
             </div>
-            <GenerateWalletModal 
-                isOpen={isModalOpen} 
-                onClose={closeModal} 
-                onWalletGenerated={handleWalletGenerated} 
+            <GenerateWalletModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                onWalletGenerated={handleWalletGenerated}
                 walletInfo={walletInfo}
             />
         </div>
