@@ -95,3 +95,50 @@ export const tokenTranferExample: ActionExample[][] = [
     }
   ]
 ];
+export const createPreWalletExample: ActionExample[][] = [
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "create wallet by user@example.com email",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will create pregenerated wallet",
+        action: "CREATE_PREWALLET"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "generate pregenerated wallet by user@example.com email",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will create pregenerated wallet",
+        action: "CREATE_PREWALLET"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "provide me new wallet using user@example.com email",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will create pregenerated wallet",
+        action: "CREATE_PREWALLET"
+      },
+    }
+  ],
+];

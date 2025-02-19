@@ -47,3 +47,19 @@ Given the recent messages, extract the following information about the requested
 - Token symbol
 
 Respond with a JSON markdown block containing only the extracted values.`; 
+export const preWalletTemplete = `Respond with a JSON markdown block containing only the extracted values. Use null for any values that cannot be determined.
+
+Example response:
+\`\`\`json
+{
+    "email": "user@example.com"
+}
+\`\`\`
+
+{{recentMessages}}
+
+Given the recent messages, extract the following information about the requested token balance:
+
+- Email address
+
+Respond with a JSON markdown block containing only the extracted values.`; 
