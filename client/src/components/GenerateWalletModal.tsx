@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import Modal from '@/components/ui/Modal';
-import { IWalletInfo } from '../types';
+import { IWalletInfo } from '../types/index';
+import { apiClient } from '../lib/api';
 
 
 interface GenerateWalletModalProps {
@@ -24,27 +24,14 @@ const GenerateWalletModal: React.FC<GenerateWalletModalProps> = ({ isOpen, onClo
     const handlePregenerateWallet = async () => {
         setLoading(true);
         try {
-            const response = await axios.post('https://in-app-wallet.thirdweb.com/api/v1/pregenerate', {
-                strategy: 'email',
-                email: email
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-ecosystem-id':'',
-                    'x-ecosystem-partner-id':'',
-                    'x-client-id':import.meta.env.VITE_THIRDWEB_CLIENT_ID,
-                    'x-secret-key':  import.meta.env.VITE_SECRET_KEY,
-                }
-            });
-
-            const walletInfo = response.data;
+            const walletInfo = await apiClient.pregenerateWallet(email);
             onWalletGenerated(walletInfo);
 
             toast({
                 title: 'Success',
                 description: 'Wallet pregenerated successfully!',
             });
-            console.log('Wallet pregenerated:', response.data);
+            console.log('Wallet pregenerated:', walletInfo);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -58,7 +45,7 @@ const GenerateWalletModal: React.FC<GenerateWalletModalProps> = ({ isOpen, onClo
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={!walletInfo ?"Generate Wallet":"Pregenerated Wallet"}>
-           {!walletInfo ?  (<><Input
+           {!walletInfo?.address ?  (<><Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -79,10 +66,10 @@ const GenerateWalletModal: React.FC<GenerateWalletModalProps> = ({ isOpen, onClo
             (
                 <div className="text-gray-800 dark:text-gray-200">
                     <div className="flex gap-1">
-                    <p className="font-mono">{walletInfo.wallet.address}</p>
+                    <p className="font-mono">{walletInfo.address}</p>
                     <p 
                         onClick={() => {
-                            navigator.clipboard.writeText(walletInfo.wallet.address);
+                            navigator.clipboard.writeText(walletInfo.address.toString());
                             setIsCopied(true); // Set copied state to true
                             setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
                         }} 
@@ -93,7 +80,7 @@ const GenerateWalletModal: React.FC<GenerateWalletModalProps> = ({ isOpen, onClo
                     </p>
                     </div>
                   
-                    <p className="mt-2">Type: <span className="font-mono">{walletInfo.wallet.type}</span></p>
+                    <p className="mt-2">Type: <span className="font-mono">{walletInfo.type}</span></p>
                 </div>
             )
             }
