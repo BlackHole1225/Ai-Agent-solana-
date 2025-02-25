@@ -18,7 +18,7 @@ import { Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import AIWriter from "react-aiwriter";
 import { getBalance, transfer } from "thirdweb/extensions/erc20";
-import { ConnectButton, useSendAndConfirmTransaction } from "thirdweb/react";
+import { ConnectButton, PayEmbed, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
 import { AudioRecorder } from "./audio-recorder";
 import CopyButton from "./copy-button";
 import { Avatar, AvatarImage } from "./ui/avatar";
@@ -63,8 +63,8 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const [input, setInput] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [walletInfo, setWalletInfo] = useState<IWalletInfo>({
-        address:'',
-        type:''
+        address: '',
+        type: ''
     });
 
     const openModal = () => setIsModalOpen(true);
@@ -241,7 +241,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
         switch (action) {
             case "GET_BALANCE":
                 const balanceContract = getErc20Contract(content.tokenAddress);
-                const balance = await getBalance({ contract:balanceContract, address: content.walletAddress });
+                const balance = await getBalance({ contract: balanceContract, address: content.walletAddress });
                 const formattedBalance = Number(balance.value) / 1e6;
                 queryClient.setQueryData(
                     ["messages", agentId],
@@ -257,7 +257,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
             case "TRANSFER_TOKEN":
                 const TransferContract = getErc20Contract(content.tokenAddress);
                 const transaction = transfer({
-                    contract:TransferContract,
+                    contract: TransferContract,
                     to: content.recipient,
                     amount: content.amount,
                 });
@@ -273,7 +273,24 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 return;
         }
     };
+    const payWithFiat = (response: any) => {
+        const { status } = response;
+        const { source:{ amount, transactionHash, token:{symbol} },fromAddress, toAddress, quote:{fromCurrency:{amount:currencyAmount, currencySymbol}}} = status;
+        const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
+        queryClient.setQueryData(
+            ["messages", agentId],
+            (old: ContentWithUser[]= []) => [
+                ...old,
+                {
+                    text: successMessage,
+                    createdAt: Date.now(),
+                }
+            ]
+        );
 
+        setForceRender(prev => !prev);
+    };
+   
     return (
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
 
@@ -281,6 +298,8 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 <Button onClick={openModal}>
                     {walletInfo?.address ? `Wallet: ${walletInfo?.address.slice(0, 6)}...${walletInfo?.address.slice(-4)}` : "Generate Wallet"}
                 </Button>
+                
+
                 <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',
@@ -296,11 +315,17 @@ export default function Page({ agentId }: { agentId: UUID }) {
                                 testMode: true,
                                 preferredProvider: "COINBASE",
                             },
+                            onPurchaseSuccess: payWithFiat,
                         },
+                        onClose: (screen: string) => {
+                            console.log({ screen });
+                        }
                     }}
                     wallets={wallets}
                     client={client}
                     chains={[mainnet, sepolia, base, polygon, baseSepolia]}
+
+
                 />
 
 

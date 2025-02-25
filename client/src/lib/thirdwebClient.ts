@@ -1,5 +1,5 @@
 import { createThirdwebClient, getContract } from "thirdweb";
-import { sepolia } from "thirdweb/chains";
+import { sepolia,mainnet } from "thirdweb/chains";
 
 console.log(import.meta.env.VITE_THIRDWEB_CLIENT_ID)
 
