@@ -11,6 +11,6 @@ export const getErc20Contract = (address: string) => {
   return getContract({
     client,
     address,
-    chain: sepolia
+    chain: mainnet
   });
 }

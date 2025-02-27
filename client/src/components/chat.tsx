@@ -14,11 +14,11 @@ import type { IAttachment } from "@/types";
 import type { Content, UUID } from "@elizaos/core";
 import { animated, useTransition, type AnimatedProps } from "@react-spring/web";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, Send, X } from "lucide-react";
+import { LucideLogIn, Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import AIWriter from "react-aiwriter";
 import { getBalance, transfer } from "thirdweb/extensions/erc20";
-import { ConnectButton, PayEmbed, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
+import { ConnectButton, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
 import { AudioRecorder } from "./audio-recorder";
 import CopyButton from "./copy-button";
 import { Avatar, AvatarImage } from "./ui/avatar";
@@ -33,6 +33,7 @@ import { SiteEmbed } from "thirdweb/react";
 
 
 import type { IWalletInfo } from "@/types/index";
+import { getContract, prepareContractCall, prepareTransaction, toWei } from "thirdweb";
 
 type ExtraContentFields = {
     user: string;
@@ -263,6 +264,14 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 });
                 sendTransaction(transaction);
                 return;
+            case "BUY_TOKEN":
+                handleFiatTransaction(
+                    content.amount,
+                    content.recipient,
+                    content.tokenSymbol,
+                    content.fiatType.toUpperCase(),
+                );
+                return;
             case "CREATE_PREWALLET":
                 try {
                     const walletInfo = await apiClient.pregenerateWallet(content.emailAddress);
@@ -275,11 +284,11 @@ export default function Page({ agentId }: { agentId: UUID }) {
     };
     const payWithFiat = (response: any) => {
         const { status } = response;
-        const { source:{ amount, transactionHash, token:{symbol} },fromAddress, toAddress, quote:{fromCurrency:{amount:currencyAmount, currencySymbol}}} = status;
+        const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
         const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
         queryClient.setQueryData(
             ["messages", agentId],
-            (old: ContentWithUser[]= []) => [
+            (old: ContentWithUser[] = []) => [
                 ...old,
                 {
                     text: successMessage,
@@ -290,7 +299,36 @@ export default function Page({ agentId }: { agentId: UUID }) {
 
         setForceRender(prev => !prev);
     };
+
+
+
+    const { mutate: sendTransactionFiat} = useSendTransaction({
+        payModal: {
+            metadata: {
+                name: "Buy Crypto",
+            },
+            buyWithFiat: {
+                testMode: true,
+                preferredProvider: "KADO",
+            },
+            onPurchaseSuccess: payWithFiat,
+        },
+    });
    
+    const handleFiatTransaction = async (tokenAmount: string, recipient: string, tokenSymbol: string, fiatType: "KADO" | "COINBASE" | "STRIPE" | "TRANSAK" | undefined) => {
+        try {
+            const transaction = prepareTransaction({
+                to: recipient,
+                value: toWei(tokenAmount),
+                chain: mainnet,
+                client: client,
+            });
+             sendTransactionFiat(transaction);
+        } catch (error) {
+            console.error("Fiat transaction error:", error);
+        }
+    };
+
     return (
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
 
@@ -298,8 +336,6 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 <Button onClick={openModal}>
                     {walletInfo?.address ? `Wallet: ${walletInfo?.address.slice(0, 6)}...${walletInfo?.address.slice(-4)}` : "Generate Wallet"}
                 </Button>
-                
-
                 <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',

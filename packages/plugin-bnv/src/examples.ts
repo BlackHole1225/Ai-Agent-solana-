@@ -142,3 +142,65 @@ export const createPreWalletExample: ActionExample[][] = [
     }
   ],
 ];
+export const buyTokenExample: ActionExample[][]=[
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "I want to buy 1 eth to 0x1e9F3bD30C9ACA6e32B92CE2cD56ceB4DD456Bb2 using my kado account",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will buy token using  fiat account",
+        action: "BUY_TOKEN"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "I want to purchase 0.01 eth to 0x1e9F3bD30C9ACA6e32B92CE2cD56ceB4DD456Bb2 using  kado account",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will buy token using  fiat account",
+        action: "BUY_TOKEN"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "send 0.01 eth to 0x1e9F3bD30C9ACA6e32B92CE2cD56ceB4DD456Bb2 using  kado account",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will buy token using  fiat account",
+        action: "BUY_TOKEN"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "I want to purchase 0.01 eth to 0x1e9F3bD30C9ACA6e32B92CE2cD56ceB4DD456Bb2 by kado account",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will buy token using  fiat account",
+        action: "BUY_TOKEN"
+      },
+    }
+  ],
+]
