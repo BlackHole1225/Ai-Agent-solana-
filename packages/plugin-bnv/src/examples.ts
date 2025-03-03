@@ -204,3 +204,51 @@ export const buyTokenExample: ActionExample[][]=[
     }
   ],
 ]
+export const verifyEmailExample : ActionExample[][]=[
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "plz verify testuser@gmail.com by number 467389.",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will verify email using verification code",
+        action: "VERIFY_EMAIL"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "The verification code of testuser@gmail.com is 467389.",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will verify email using verification code",
+        action: "VERIFY_EMAIL"
+      },
+    }
+  ],
+  [
+    {
+      user: "{{user1}}",
+      content: {
+        text: "verify testuser@gmail.com by 467389.",
+      },
+    },
+    {
+      user: "{{agent}}",
+      content: {
+        text: "Will verify email using verification code",
+        action: "VERIFY_EMAIL"
+      },
+    }
+  ]
+  
+]

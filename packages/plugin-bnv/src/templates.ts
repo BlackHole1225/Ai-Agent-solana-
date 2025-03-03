@@ -85,3 +85,22 @@ Given the recent messages, extract the following information about the requested
 - Amount to purchase
 
 Respond with a JSON markdown block containing only the extracted values.`; 
+
+export const verifyEmailTemplate = `Respond with a JSON markdown block containing only the extracted values. Use null for any values that cannot be determined.
+Example response:
+\`\`\`json
+{
+    "email": "testuser@gmailcom",
+    "verificationCode": "123567",
+   
+}
+\`\`\`
+
+{{recentMessages}}
+
+Given the recent messages, extract the following information about the requested email verification:
+- email address
+- verification code
+
+
+Respond with a JSON markdown block containing only the extracted values.`; 

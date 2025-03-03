@@ -18,7 +18,7 @@ import { LucideLogIn, Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import AIWriter from "react-aiwriter";
 import { getBalance, transfer } from "thirdweb/extensions/erc20";
-import { ConnectButton, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
+import { ConnectButton, useConnect, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
 import { AudioRecorder } from "./audio-recorder";
 import CopyButton from "./copy-button";
 import { Avatar, AvatarImage } from "./ui/avatar";
@@ -27,7 +27,7 @@ import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { mainnet, sepolia, base, polygon, baseSepolia } from "thirdweb/chains";
-import { inAppWallet } from "thirdweb/wallets";
+import { inAppWallet, preAuthenticate } from "thirdweb/wallets";
 import GenerateWalletModal from "./GenerateWalletModal";
 import { SiteEmbed } from "thirdweb/react";
 
@@ -67,7 +67,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
         address: '',
         type: ''
     });
-
+    const { connect } = useConnect();
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -276,16 +276,77 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 try {
                     const walletInfo = await apiClient.pregenerateWallet(content.emailAddress);
                     setWalletInfo(walletInfo);
+                    await preAuthenticate({
+                        client,
+                        strategy: "email",
+                        email: content.emailAddress, // ex: user@example.com
+                    });
+                    queryClient.setQueryData(
+                        ["messages", agentId],
+                        (old: ContentWithUser[]) => [
+                            ...old,
+                            {
+                                text: `Email verification code was sent your email (${content.emailAddress}).\nPlease check your email and send verification code by message like 'verification code is 000000' for login.
+                                `,
+                                createdAt: Date.now(),
+                            }
+                        ]
+                    );
                 } catch (error) {
                     console.error('Error creating prewallet:', error);
                 }
                 return;
+            case "VERIFY_EMAIL":
+                handleLogin(content.email, content.verificationCode)
+                return;
         }
     };
+    const handleLogin = async (
+        email: string,
+        verificationCode: string,
+    ) => {
+        // verify email and connect
+        try {
+            const loggedInWallet = await connect(async () => {
+                const wallet = inAppWallet();
+                await wallet.connect({
+                    client,
+                    strategy: "email",
+                    email,
+                    verificationCode,
+                });
+                return wallet;
+            });
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[]) => [
+                    ...old,
+                    {
+                        text: `Successfully logged in by ${loggedInWallet}`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+        }catch{
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[]) => [
+                    ...old,
+                    {
+                        text: `Failed`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+        }
+      };
     const payWithFiat = (response: any) => {
-        const { status } = response;
-        const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
-        const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
+        console.log("fiatResponse:", response);
+        const { response: { fiatAmount, cryptoAmount, fiatCurrency, cryptoCurrency, totalFee, feeBreakdown, network } } = response;
+        
+        const feeDetails = feeBreakdown.map((fee: { name: string; value: number }) => `${fee.name}: ${fee.value}`).join(", ");
+        const successMessage = `Transaction completed. You bought ${cryptoAmount} ${cryptoCurrency} for ${fiatAmount} ${fiatCurrency} on ${network} network. Total fees: ${totalFee}. Fee breakdown: ${feeDetails}.`;
+        
         queryClient.setQueryData(
             ["messages", agentId],
             (old: ContentWithUser[] = []) => [
@@ -299,22 +360,33 @@ export default function Page({ agentId }: { agentId: UUID }) {
 
         setForceRender(prev => !prev);
     };
+    // for kado
+    // const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
+    // const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
+    // queryClient.setQueryData(
+    //     ["messages", agentId],
+    //     (old: ContentWithUser[] = []) => [
+    //         ...old,
+    //         {
+    //             text: successMessage,
+    //             createdAt: Date.now(),
+    //         }
+    //     ]
+    // );
 
-
-
-    const { mutate: sendTransactionFiat} = useSendTransaction({
+    const { mutate: sendTransactionFiat } = useSendTransaction({
         payModal: {
             metadata: {
                 name: "Buy Crypto",
             },
             buyWithFiat: {
                 testMode: true,
-                preferredProvider: "KADO",
+                preferredProvider: "TRANSAK",
             },
             onPurchaseSuccess: payWithFiat,
         },
     });
-   
+
     const handleFiatTransaction = async (tokenAmount: string, recipient: string, tokenSymbol: string, fiatType: "KADO" | "COINBASE" | "STRIPE" | "TRANSAK" | undefined) => {
         try {
             const transaction = prepareTransaction({
@@ -323,7 +395,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 chain: mainnet,
                 client: client,
             });
-             sendTransactionFiat(transaction);
+            sendTransactionFiat(transaction);
         } catch (error) {
             console.error("Fiat transaction error:", error);
         }
@@ -333,9 +405,9 @@ export default function Page({ agentId }: { agentId: UUID }) {
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
 
             <div className="flex justify-end">
-                <Button onClick={openModal}>
+                {/* <Button onClick={openModal}>
                     {walletInfo?.address ? `Wallet: ${walletInfo?.address.slice(0, 6)}...${walletInfo?.address.slice(-4)}` : "Generate Wallet"}
-                </Button>
+                </Button> */}
                 <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',
