@@ -14,7 +14,7 @@ import type { IAttachment } from "@/types";
 import type { Content, UUID } from "@elizaos/core";
 import { animated, useTransition, type AnimatedProps } from "@react-spring/web";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LucideLogIn, Paperclip, Send, X } from "lucide-react";
+import { Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import AIWriter from "react-aiwriter";
 import { getBalance, transfer } from "thirdweb/extensions/erc20";
@@ -29,11 +29,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { mainnet, sepolia, base, polygon, baseSepolia } from "thirdweb/chains";
 import { inAppWallet, preAuthenticate } from "thirdweb/wallets";
 import GenerateWalletModal from "./GenerateWalletModal";
-import { SiteEmbed } from "thirdweb/react";
 
 
 import type { IWalletInfo } from "@/types/index";
-import { getContract, prepareContractCall, prepareTransaction, toWei } from "thirdweb";
+import { prepareTransaction, toWei } from "thirdweb";
 
 type ExtraContentFields = {
     user: string;
@@ -68,7 +67,6 @@ export default function Page({ agentId }: { agentId: UUID }) {
         type: ''
     });
     const { connect } = useConnect();
-    const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +86,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
         smooth: true,
     });
 
-    const [forceRender, setForceRender] = useState(false);
+    const [, setForceRender] = useState(false);
 
     useEffect(() => {
         if (txData?.status === "success") {
@@ -317,7 +315,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 });
                 return wallet;
             });
-            
+
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[]) => [
@@ -328,7 +326,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     }
                 ]
             );
-        }catch{
+        } catch {
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[]) => [
@@ -340,14 +338,14 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 ]
             );
         }
-      };
+    };
     const payWithFiat = (response: any) => {
         console.log("fiatResponse:", response);
         const { response: { fiatAmount, cryptoAmount, fiatCurrency, cryptoCurrency, totalFee, feeBreakdown, network } } = response;
-        
+
         const feeDetails = feeBreakdown.map((fee: { name: string; value: number }) => `${fee.name}: ${fee.value}`).join(", ");
         const successMessage = `Transaction completed. You bought ${cryptoAmount} ${cryptoCurrency} for ${fiatAmount} ${fiatCurrency} on ${network} network. Total fees: ${totalFee}. Fee breakdown: ${feeDetails}.`;
-        
+
         queryClient.setQueryData(
             ["messages", agentId],
             (old: ContentWithUser[] = []) => [
@@ -388,7 +386,8 @@ export default function Page({ agentId }: { agentId: UUID }) {
         },
     });
 
-    const handleFiatTransaction = async (tokenAmount: string, recipient: string, tokenSymbol: string, fiatType: "KADO" | "COINBASE" | "STRIPE" | "TRANSAK" | undefined) => {
+    // const handleFiatTransaction = async (tokenAmount: string, recipient: string, tokenSymbol: string, fiatType: "KADO" | "COINBASE" | "STRIPE" | "TRANSAK" | undefined) => {
+    const handleFiatTransaction = async (tokenAmount: string, recipient: string) => {
         try {
             const transaction = prepareTransaction({
                 to: recipient,
