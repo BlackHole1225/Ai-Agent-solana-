@@ -307,7 +307,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
     ) => {
         // verify email and connect
         try {
-            const loggedInWallet = await connect(async () => {
+            await connect(async () => {
                 const wallet = inAppWallet();
                 await wallet.connect({
                     client,
@@ -317,12 +317,13 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 });
                 return wallet;
             });
+            
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[]) => [
                     ...old,
                     {
-                        text: `Successfully logged in by ${loggedInWallet}`,
+                        text: `Successfully logged in by ${email}`,
                         createdAt: Date.now(),
                     }
                 ]
