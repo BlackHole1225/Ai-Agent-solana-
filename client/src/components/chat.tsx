@@ -8,7 +8,7 @@ import { ChatInput } from "@/components/ui/chat/chat-input";
 import { ChatMessageList } from "@/components/ui/chat/chat-message-list";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { client, getErc20Contract } from "@/lib/thirdwebClient";
+import { client, getErc20Contract, getDevErc20Contract } from "@/lib/thirdwebClient";
 import { cn, moment } from "@/lib/utils";
 import type { IAttachment } from "@/types";
 import type { Content, UUID } from "@elizaos/core";
@@ -239,7 +239,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const handleAction = async (action: any, content: any) => {
         switch (action) {
             case "GET_BALANCE":
-                const balanceContract = getErc20Contract(content.tokenAddress);
+                const balanceContract = getDevErc20Contract(content.tokenAddress);
                 const balance = await getBalance({ contract: balanceContract, address: content.walletAddress });
                 const formattedBalance = Number(balance.value) / 1e6;
                 queryClient.setQueryData(
@@ -266,8 +266,6 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 handleFiatTransaction(
                     content.amount,
                     content.recipient,
-                    content.tokenSymbol,
-                    content.fiatType.toUpperCase(),
                 );
                 return;
             case "CREATE_PREWALLET":
@@ -341,11 +339,27 @@ export default function Page({ agentId }: { agentId: UUID }) {
     };
     const payWithFiat = (response: any) => {
         console.log("fiatResponse:", response);
-        const { response: { fiatAmount, cryptoAmount, fiatCurrency, cryptoCurrency, totalFee, feeBreakdown, network } } = response;
+        const { status } = response;
 
-        const feeDetails = feeBreakdown.map((fee: { name: string; value: number }) => `${fee.name}: ${fee.value}`).join(", ");
-        const successMessage = `Transaction completed. You bought ${cryptoAmount} ${cryptoCurrency} for ${fiatAmount} ${fiatCurrency} on ${network} network. Total fees: ${totalFee}. Fee breakdown: ${feeDetails}.`;
+        // const { response: { fiatAmount, cryptoAmount, fiatCurrency, cryptoCurrency, totalFee, feeBreakdown, network } } = response;
 
+        // const feeDetails = feeBreakdown.map((fee: { name: string; value: number }) => `${fee.name}: ${fee.value}`).join(", ");
+        // const successMessage = `Transaction completed. You bought ${cryptoAmount} ${cryptoCurrency} for ${fiatAmount} ${fiatCurrency} on ${network} network. Total fees: ${totalFee}. Fee breakdown: ${feeDetails}.`;
+
+        // queryClient.setQueryData(
+        //     ["messages", agentId],
+        //     (old: ContentWithUser[] = []) => [
+        //         ...old,
+        //         {
+        //             text: successMessage,
+        //             createdAt: Date.now(),
+        //         }
+        //     ]
+        // );
+
+        // for kado
+        const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
+        const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
         queryClient.setQueryData(
             ["messages", agentId],
             (old: ContentWithUser[] = []) => [
@@ -356,22 +370,8 @@ export default function Page({ agentId }: { agentId: UUID }) {
                 }
             ]
         );
-
         setForceRender(prev => !prev);
     };
-    // for kado
-    // const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
-    // const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
-    // queryClient.setQueryData(
-    //     ["messages", agentId],
-    //     (old: ContentWithUser[] = []) => [
-    //         ...old,
-    //         {
-    //             text: successMessage,
-    //             createdAt: Date.now(),
-    //         }
-    //     ]
-    // );
 
     const { mutate: sendTransactionFiat } = useSendTransaction({
         payModal: {

@@ -1,5 +1,5 @@
 import { createThirdwebClient, getContract } from "thirdweb";
-import { mainnet } from "thirdweb/chains";
+import { mainnet, sepolia } from "thirdweb/chains";
 
 console.log(import.meta.env.VITE_THIRDWEB_CLIENT_ID)
 
@@ -12,5 +12,12 @@ export const getErc20Contract = (address: string) => {
     client,
     address,
     chain: mainnet
+  });
+}
+export const getDevErc20Contract = (address: string) => {
+  return getContract({
+    client,
+    address,
+    chain: sepolia
   });
 }
