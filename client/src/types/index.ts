@@ -3,3 +3,7 @@ export interface IAttachment {
     contentType: string;
     title: string;
 }
+export interface IWalletInfo {
+    address: String,
+    type: String
+}

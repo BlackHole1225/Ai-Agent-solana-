@@ -1,7 +1,8 @@
 import type { UUID, Character } from "@elizaos/core";
+import axios from 'axios';
 
 const BASE_URL = `http://localhost:${import.meta.env.VITE_SERVER_PORT}`;
-
+const PREGENERATE_URL= 'https://in-app-wallet.thirdweb.com/api/v1/pregenerate';
 const fetcher = async ({
     url,
     method,
@@ -106,5 +107,20 @@ export const apiClient = {
             method: "POST",
             body: formData,
         });
+    },
+    pregenerateWallet: async (email: string) => {
+        const response =  await axios.post(PREGENERATE_URL, {
+            strategy: 'email',
+            email: email
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-ecosystem-id': '',
+                'x-ecosystem-partner-id': '',
+                'x-client-id': import.meta.env.VITE_THIRDWEB_CLIENT_ID || '',
+                'x-secret-key': import.meta.env.VITE_SECRET_KEY || '',
+            }
+        });
+        return response.data.wallet;
     },
 };

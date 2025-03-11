@@ -6,30 +6,45 @@ import {
 } from "@/components/ui/chat/chat-bubble";
 import { ChatInput } from "@/components/ui/chat/chat-input";
 import { ChatMessageList } from "@/components/ui/chat/chat-message-list";
-import { useTransition, animated, type AnimatedProps } from "@react-spring/web";
+import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
+import { client, getErc20Contract, getDevErc20Contract } from "@/lib/thirdwebClient";
+import { cn, moment } from "@/lib/utils";
+import type { IAttachment } from "@/types";
+import type { Content, UUID } from "@elizaos/core";
+import { animated, useTransition, type AnimatedProps } from "@react-spring/web";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { Content, UUID } from "@elizaos/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api";
-import { cn, moment } from "@/lib/utils";
-import { Avatar, AvatarImage } from "./ui/avatar";
-import CopyButton from "./copy-button";
-import ChatTtsButton from "./ui/chat/chat-tts-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { useToast } from "@/hooks/use-toast";
 import AIWriter from "react-aiwriter";
-import type { IAttachment } from "@/types";
+import { getBalance, transfer } from "thirdweb/extensions/erc20";
+import { ConnectButton, useConnect, useSendAndConfirmTransaction, useSendTransaction } from "thirdweb/react";
 import { AudioRecorder } from "./audio-recorder";
+import CopyButton from "./copy-button";
+import { Avatar, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
+import ChatTtsButton from "./ui/chat/chat-tts-button";
 import { useAutoScroll } from "./ui/chat/hooks/useAutoScroll";
-import { ConnectButton } from "thirdweb/react";
-import { client } from "@/lib/thirdwebClient";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { mainnet, sepolia, base, polygon, baseSepolia } from "thirdweb/chains";
+import { inAppWallet, preAuthenticate } from "thirdweb/wallets";
+import GenerateWalletModal from "./GenerateWalletModal";
+
+
+import type { IWalletInfo } from "@/types/index";
+import { prepareTransaction, toWei } from "thirdweb";
 
 type ExtraContentFields = {
     user: string;
     createdAt: number;
     isLoading?: boolean;
+    content?: {
+        tokenAddress: string;
+        tokenSymbol: string;
+        amount: string;
+        recipient: string;
+        walletAddress: string;
+    }
 };
 
 type ContentWithUser = Content & ExtraContentFields;
@@ -37,14 +52,30 @@ type ContentWithUser = Content & ExtraContentFields;
 type AnimatedDivProps = AnimatedProps<{ style: React.CSSProperties }> & {
     children?: React.ReactNode;
 };
-
+const wallets = [
+    inAppWallet({
+        auth: { options: ["email", "passkey", "google"] },
+    }),
+];
 export default function Page({ agentId }: { agentId: UUID }) {
     const { toast } = useToast();
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [input, setInput] = useState("");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [walletInfo, setWalletInfo] = useState<IWalletInfo>({
+        address: '',
+        type: ''
+    });
+    const { connect } = useConnect();
+    const closeModal = () => setIsModalOpen(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
+
+    const { mutate: sendTransaction, error, data: txData, isPending: txPending } = useSendAndConfirmTransaction();
+
+    if (error) console.error(error);
+    if (txData) console.log(txData);
 
     const queryClient = useQueryClient();
 
@@ -54,6 +85,25 @@ export default function Page({ agentId }: { agentId: UUID }) {
     const { scrollRef, isAtBottom, scrollToBottom, disableAutoScroll } = useAutoScroll({
         smooth: true,
     });
+
+    const [, setForceRender] = useState(false);
+
+    useEffect(() => {
+        if (txData?.status === "success") {
+            console.log('successfully', txData.transactionHash);
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[] = []) => [
+                    ...old.filter((msg) => !msg.isLoading),
+                    {
+                        text: `Token transfer was successful.\n Transaction Hash: ${txData.transactionHash}`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+            setForceRender(prev => !prev);
+        }
+    }, [txData]);
 
     useEffect(() => {
         scrollToBottom();
@@ -130,7 +180,8 @@ export default function Page({ agentId }: { agentId: UUID }) {
             message: string;
             selectedFile?: File | null;
         }) => apiClient.sendMessage(agentId, message, selectedFile),
-        onSuccess: (newMessages: ContentWithUser[]) => {
+        onSuccess: async (newMessages: ContentWithUser[]) => {
+            console.log(newMessages)
             queryClient.setQueryData(
                 ["messages", agentId],
                 (old: ContentWithUser[] = []) => [
@@ -141,8 +192,17 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     })),
                 ]
             );
+
+            console.log("newMessages:", newMessages);
+            if (newMessages.length > 1 && newMessages[1]?.content) {
+                const content = newMessages[1].content;
+                const action = newMessages[0].action;
+                console.log("content", content);
+                await handleAction(action, content);
+            }
         },
         onError: (e) => {
+            console.error(e)
             toast({
                 variant: "destructive",
                 title: "Unable to send message",
@@ -172,9 +232,182 @@ export default function Page({ agentId }: { agentId: UUID }) {
 
     const CustomAnimatedDiv = animated.div as React.FC<AnimatedDivProps>;
 
+    const handleWalletGenerated = (walletInfo: IWalletInfo) => {
+        setWalletInfo(walletInfo);
+    };
+
+    const handleAction = async (action: any, content: any) => {
+        switch (action) {
+            case "GET_BALANCE":
+                const balanceContract = getDevErc20Contract(content.tokenAddress);
+                const balance = await getBalance({ contract: balanceContract, address: content.walletAddress });
+                const formattedBalance = Number(balance.value) / 1e6;
+                queryClient.setQueryData(
+                    ["messages", agentId],
+                    (old: ContentWithUser[]) => [
+                        ...old,
+                        {
+                            text: `Balance retrieved: ${formattedBalance.toFixed(2)} USDC`,
+                            createdAt: Date.now(),
+                        }
+                    ]
+                );
+                return;
+            case "TRANSFER_TOKEN":
+                const TransferContract = getErc20Contract(content.tokenAddress);
+                const transaction = transfer({
+                    contract: TransferContract,
+                    to: content.recipient,
+                    amount: content.amount,
+                });
+                sendTransaction(transaction);
+                return;
+            case "BUY_TOKEN":
+                handleFiatTransaction(
+                    content.amount,
+                    content.recipient,
+                );
+                return;
+            case "CREATE_PREWALLET":
+                try {
+                    const walletInfo = await apiClient.pregenerateWallet(content.emailAddress);
+                    setWalletInfo(walletInfo);
+                    await preAuthenticate({
+                        client,
+                        strategy: "email",
+                        email: content.emailAddress, // ex: user@example.com
+                    });
+                    queryClient.setQueryData(
+                        ["messages", agentId],
+                        (old: ContentWithUser[]) => [
+                            ...old,
+                            {
+                                text: `Email verification code was sent your email (${content.emailAddress}).\nPlease check your email and send verification code by message like 'verification code is 000000' for login.
+                                `,
+                                createdAt: Date.now(),
+                            }
+                        ]
+                    );
+                } catch (error) {
+                    console.error('Error creating prewallet:', error);
+                }
+                return;
+            case "VERIFY_EMAIL":
+                handleLogin(content.email, content.verificationCode)
+                return;
+        }
+    };
+    const handleLogin = async (
+        email: string,
+        verificationCode: string,
+    ) => {
+        // verify email and connect
+        try {
+            await connect(async () => {
+                const wallet = inAppWallet();
+                await wallet.connect({
+                    client,
+                    strategy: "email",
+                    email,
+                    verificationCode,
+                });
+                return wallet;
+            });
+
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[]) => [
+                    ...old,
+                    {
+                        text: `Successfully logged in by ${email}`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+        } catch {
+            queryClient.setQueryData(
+                ["messages", agentId],
+                (old: ContentWithUser[]) => [
+                    ...old,
+                    {
+                        text: `Failed`,
+                        createdAt: Date.now(),
+                    }
+                ]
+            );
+        }
+    };
+    const payWithFiat = (response: any) => {
+        console.log("fiatResponse:", response);
+        const { status } = response;
+
+        // const { response: { fiatAmount, cryptoAmount, fiatCurrency, cryptoCurrency, totalFee, feeBreakdown, network } } = response;
+
+        // const feeDetails = feeBreakdown.map((fee: { name: string; value: number }) => `${fee.name}: ${fee.value}`).join(", ");
+        // const successMessage = `Transaction completed. You bought ${cryptoAmount} ${cryptoCurrency} for ${fiatAmount} ${fiatCurrency} on ${network} network. Total fees: ${totalFee}. Fee breakdown: ${feeDetails}.`;
+
+        // queryClient.setQueryData(
+        //     ["messages", agentId],
+        //     (old: ContentWithUser[] = []) => [
+        //         ...old,
+        //         {
+        //             text: successMessage,
+        //             createdAt: Date.now(),
+        //         }
+        //     ]
+        // );
+
+        // for kado
+        const { source: { amount, transactionHash, token: { symbol } }, fromAddress, toAddress, quote: { fromCurrency: { amount: currencyAmount, currencySymbol } } } = status;
+        const successMessage = `Transaction completed from ${fromAddress} to ${toAddress} for amount ${amount} ${symbol}(${currencyAmount} ${currencySymbol}). Transaction Hash: ${transactionHash}`;
+        queryClient.setQueryData(
+            ["messages", agentId],
+            (old: ContentWithUser[] = []) => [
+                ...old,
+                {
+                    text: successMessage,
+                    createdAt: Date.now(),
+                }
+            ]
+        );
+        setForceRender(prev => !prev);
+    };
+
+    const { mutate: sendTransactionFiat } = useSendTransaction({
+        payModal: {
+            metadata: {
+                name: "Buy Crypto",
+            },
+            buyWithFiat: {
+                testMode: true,
+                preferredProvider: "TRANSAK",
+            },
+            onPurchaseSuccess: payWithFiat,
+        },
+    });
+
+    // const handleFiatTransaction = async (tokenAmount: string, recipient: string, tokenSymbol: string, fiatType: "KADO" | "COINBASE" | "STRIPE" | "TRANSAK" | undefined) => {
+    const handleFiatTransaction = async (tokenAmount: string, recipient: string) => {
+        try {
+            const transaction = prepareTransaction({
+                to: recipient,
+                value: toWei(tokenAmount),
+                chain: mainnet,
+                client: client,
+            });
+            sendTransactionFiat(transaction);
+        } catch (error) {
+            console.error("Fiat transaction error:", error);
+        }
+    };
+
     return (
         <div className="flex flex-col w-full h-[calc(100dvh)] p-4">
+
             <div className="flex justify-end">
+                {/* <Button onClick={openModal}>
+                    {walletInfo?.address ? `Wallet: ${walletInfo?.address.slice(0, 6)}...${walletInfo?.address.slice(-4)}` : "Generate Wallet"}
+                </Button> */}
                 <ConnectButton
                     connectButton={{
                         className: 'p-1 w-48 h-12',
@@ -184,8 +417,26 @@ export default function Page({ agentId }: { agentId: UUID }) {
                             minWidth: "120px"
                         }
                     }}
+                    detailsModal={{
+                        payOptions: {
+                            buyWithFiat: {
+                                testMode: true,
+                                preferredProvider: "COINBASE",
+                            },
+                            onPurchaseSuccess: payWithFiat,
+                        },
+                        onClose: (screen: string) => {
+                            console.log({ screen });
+                        }
+                    }}
+                    wallets={wallets}
                     client={client}
+                    chains={[mainnet, sepolia, base, polygon, baseSepolia]}
+
+
                 />
+
+
             </div>
             <div className="flex-1 overflow-y-auto">
                 <ChatMessageList
@@ -251,7 +502,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                                             </div>
                                         </ChatBubbleMessage>
                                         <div className="flex items-center gap-4 justify-between w-full mt-1">
-                                            {message?.text &&
+                                            {message?.text?.length &&
                                                 !message?.isLoading ? (
                                                 <div className="flex items-center gap-1">
                                                     <CopyButton
@@ -368,7 +619,7 @@ export default function Page({ agentId }: { agentId: UUID }) {
                             onChange={(newInput: string) => setInput(newInput)}
                         />
                         <Button
-                            disabled={!input || sendMessageMutation?.isPending}
+                            disabled={!input || sendMessageMutation?.isPending || txPending}
                             type="submit"
                             size="sm"
                             className="ml-auto gap-1.5 h-[30px]"
@@ -381,6 +632,12 @@ export default function Page({ agentId }: { agentId: UUID }) {
                     </div>
                 </form>
             </div>
+            <GenerateWalletModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                onWalletGenerated={handleWalletGenerated}
+                walletInfo={walletInfo}
+            />
         </div>
     );
 }
